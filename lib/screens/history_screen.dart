@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
 import '../providers/history_provider.dart';
 import '../models/models.dart';
-import 'history_detail_screen.dart'; // Import the new screen
+import 'history_detail_screen.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
@@ -121,7 +122,6 @@ class HistoryScreen extends StatelessWidget {
                   separatorBuilder: (context, index) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final ticket = historyProvider.tickets[index];
-                    // ✨ CHANGE: Added GestureDetector for navigation ✨
                     return GestureDetector(
                       onTap: () {
                         Navigator.of(context).push(
@@ -183,6 +183,9 @@ class HistoryScreen extends StatelessWidget {
     final isSuccess = ticket.status == 'Success';
     final statusColor = isSuccess ? Colors.green : Colors.red;
     final statusIcon = isSuccess ? Icons.check_circle : Icons.error_outline;
+    final hasScreenshot = ticket.hasScreenshot && 
+                          ticket.screenshotPath != null &&
+                          File(ticket.screenshotPath!).existsSync();
 
     return Card(
       elevation: 2,
@@ -193,28 +196,79 @@ class HistoryScreen extends StatelessWidget {
           children: [
             Row(
               children: [
+                // Project icon or screenshot preview
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                   ),
-                  child: Icon(
-                    Icons.business,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 20,
-                  ),
+                  child: hasScreenshot
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.file(
+                            File(ticket.screenshotPath!),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Icon(
+                                Icons.business,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 20,
+                              );
+                            },
+                          ),
+                        )
+                      : Icon(
+                          Icons.business,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20,
+                        ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        ticket.projectName,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              ticket.projectName,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          if (hasScreenshot)
+                            Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.camera_alt,
+                                    size: 12,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Screenshot',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -258,6 +312,27 @@ class HistoryScreen extends StatelessWidget {
                 ),
               ],
             ),
+            // Add tap hint for screenshot items
+            if (hasScreenshot) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.touch_app,
+                    size: 14,
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Tap to view submission screenshot',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

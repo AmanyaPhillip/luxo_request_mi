@@ -8,7 +8,7 @@ class UserData {
   final String realEstateProject;
   final String unit;
   final String language;
-  final String? imagePath;
+  final String? imagePath; // This now stores either uploaded file or screenshot path
 
   UserData({
     required this.title,
@@ -49,6 +49,12 @@ class UserData {
       imagePath: json['imagePath'],
     );
   }
+
+  // Helper method to check if imagePath is a screenshot (contains 'screenshot_')
+  bool get hasScreenshot => imagePath != null && imagePath!.contains('screenshot_');
+  
+  // Helper method to check if imagePath is an uploaded file
+  bool get hasUploadedFile => imagePath != null && !imagePath!.contains('screenshot_');
 }
 
 // History ticket model
@@ -64,6 +70,10 @@ class Ticket {
   });
 
   String get projectName => submittedData.realEstateProject;
+
+  // Helper methods for screenshot handling
+  bool get hasScreenshot => submittedData.hasScreenshot;
+  String? get screenshotPath => hasScreenshot ? submittedData.imagePath : null;
 
   Map<String, dynamic> toJson() {
     return {

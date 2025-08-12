@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:provider/provider.dart';
@@ -30,138 +31,340 @@ class _WebViewScreenState extends State<WebViewScreen> {
   bool _isInitialLoad = true;
   bool _submissionRecorded = false;
   String? _uploadedFilePath;
+  bool _showingSuccessCountdown = false;
+  int _countdownSeconds = 7;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Submit Request'),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          // Add file upload button in app bar
-          IconButton(
-            icon: const Icon(Icons.attach_file),
-            onPressed: _handleFileUpload,
-            tooltip: 'Upload File',
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          if (_isLoading)
-            LinearProgressIndicator(
-              value: _loadingProgress,
-              backgroundColor: Colors.grey[300],
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Theme.of(context).colorScheme.primary,
-              ),
-            ),
-          if (_uploadedFilePath != null)
-            Container(
-              padding: const EdgeInsets.all(8),
-              color: Colors.green.withOpacity(0.1),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'File uploaded: ${_uploadedFilePath!.split('/').last}',
-                      style: const TextStyle(color: Colors.green, fontSize: 12),
-                    ),
-                  ),
+    return WillPopScope(
+      onWillPop: () async {
+        // Prevent back navigation during success countdown
+        return !_showingSuccessCountdown;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Submit Request'),
+          leading: _showingSuccessCountdown 
+              ? null 
+              : IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+          actions: _showingSuccessCountdown 
+              ? null 
+              : [
                   IconButton(
-                    icon: const Icon(Icons.close, size: 16),
-                    onPressed: () {
-                      setState(() {
-                        _uploadedFilePath = null;
-                      });
-                    },
+                    icon: const Icon(Icons.attach_file),
+                    onPressed: _handleFileUpload,
+                    tooltip: 'Upload File',
                   ),
                 ],
-              ),
-            ),
-          Expanded(
-            child: InAppWebView(
-              initialUrlRequest: URLRequest(url: WebUri(widget.url)),
-              onWebViewCreated: (controller) {
-                _webViewController = controller;
-              },
-              onLoadStart: (controller, url) {
-                setState(() {
-                  _isLoading = true;
-                  _loadingProgress = 0;
-                });
-              },
-              onProgressChanged: (controller, progress) {
-                setState(() {
-                  _loadingProgress = progress / 100;
-                });
-              },
-              onLoadStop: (controller, url) async {
-                setState(() {
-                  _isLoading = false;
-                });
-                if (_isInitialLoad) {
-                  await _populateFormFields();
-                  setState(() {
-                    _isInitialLoad = false;
-                  });
-                }
-              },
-              onUpdateVisitedHistory: (controller, url, isReload) {
-                if (!_isInitialLoad && url.toString() != widget.url) {
-                  _checkSubmissionResult(url?.toString() ?? '');
-                }
-              },
-              onPermissionRequest: (controller, request) async {
-                return PermissionResponse(
-                  resources: request.resources,
-                  action: PermissionResponseAction.GRANT,
-                );
-              },
-              initialSettings: InAppWebViewSettings(
-                useShouldOverrideUrlLoading: true,
-                mediaPlaybackRequiresUserGesture: false,
-                allowsInlineMediaPlayback : true,
-                javaScriptEnabled: true,
-                domStorageEnabled: true,
-                allowFileAccessFromFileURLs: true,
-                allowUniversalAccessFromFileURLs: true,
-              ),
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        ),
+        body: Stack(
           children: [
-            if (_uploadedFilePath == null)
-              ElevatedButton.icon(
-                onPressed: _handleFileUpload,
-                icon: const Icon(Icons.upload_file),
-                label: const Text('Upload File'),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 48),
+            Column(
+              children: [
+                if (_isLoading && !_showingSuccessCountdown)
+                  LinearProgressIndicator(
+                    value: _loadingProgress,
+                    backgroundColor: Colors.grey[300],
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                if (_uploadedFilePath != null && !_showingSuccessCountdown)
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    color: Colors.green.withOpacity(0.1),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'File uploaded: ${_uploadedFilePath!.split('/').last}',
+                            style: const TextStyle(color: Colors.green, fontSize: 12),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 16),
+                          onPressed: () {
+                            setState(() {
+                              _uploadedFilePath = null;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                Expanded(
+                  child: InAppWebView(
+                    initialUrlRequest: URLRequest(url: WebUri(widget.url)),
+                    onWebViewCreated: (controller) {
+                      _webViewController = controller;
+                    },
+                    onLoadStart: (controller, url) {
+                      if (!_showingSuccessCountdown) {
+                        setState(() {
+                          _isLoading = true;
+                          _loadingProgress = 0;
+                        });
+                      }
+                    },
+                    onProgressChanged: (controller, progress) {
+                      if (!_showingSuccessCountdown) {
+                        setState(() {
+                          _loadingProgress = progress / 100;
+                        });
+                      }
+                    },
+                    onLoadStop: (controller, url) async {
+                      if (!_showingSuccessCountdown) {
+                        setState(() {
+                          _isLoading = false;
+                        });
+                        if (_isInitialLoad) {
+                          await _populateFormFields();
+                          setState(() {
+                            _isInitialLoad = false;
+                          });
+                        }
+                        // Check for success message in page content
+                        await _checkPageForSuccess();
+                      }
+                    },
+                    onUpdateVisitedHistory: (controller, url, isReload) {
+                      if (!_isInitialLoad && url.toString() != widget.url && !_showingSuccessCountdown) {
+                        _checkSubmissionResult(url?.toString() ?? '');
+                      }
+                    },
+                    onPermissionRequest: (controller, request) async {
+                      return PermissionResponse(
+                        resources: request.resources,
+                        action: PermissionResponseAction.GRANT,
+                      );
+                    },
+                    initialSettings: InAppWebViewSettings(
+                      useShouldOverrideUrlLoading: true,
+                      mediaPlaybackRequiresUserGesture: false,
+                      allowsInlineMediaPlayback : true,
+                      javaScriptEnabled: true,
+                      domStorageEnabled: true,
+                      allowFileAccessFromFileURLs: true,
+                      allowUniversalAccessFromFileURLs: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
+            // Success countdown overlay
+            if (_showingSuccessCountdown)
+              Container(
+                color: Colors.black.withOpacity(0.8),
+                child: Center(
+                  child: Card(
+                    margin: const EdgeInsets.all(32),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            color: Colors.green,
+                            size: 64,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Request Submitted Successfully!',
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Returning to main screen in $_countdownSeconds seconds...',
+                            style: Theme.of(context).textTheme.bodyLarge,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: 60,
+                            height: 60,
+                            child: Stack(
+                              children: [
+                                CircularProgressIndicator(
+                                  value: (7 - _countdownSeconds) / 7,
+                                  strokeWidth: 4,
+                                  backgroundColor: Colors.grey[300],
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                                Center(
+                                  child: Text(
+                                    '$_countdownSeconds',
+                                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            const SizedBox(height: 8),
-            Text(
-              'Form will be automatically populated. Please review and submit.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
-                  ),
-              textAlign: TextAlign.center,
-            ),
           ],
+        ),
+        bottomNavigationBar: _showingSuccessCountdown ? null : Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_uploadedFilePath == null)
+                ElevatedButton.icon(
+                  onPressed: _handleFileUpload,
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Upload File'),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                ),
+              const SizedBox(height: 8),
+              Text(
+                'Form will be automatically populated. Please review and submit.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _checkPageForSuccess() async {
+    if (_webViewController == null || _submissionRecorded) return;
+    
+    final jsCode = '''
+      (function() {
+        var bodyText = document.body.innerText.toLowerCase();
+        var successIndicators = [
+          'request submitted successfully',
+          'demande soumise avec succès',
+          'thank you',
+          'merci',
+          'success',
+          'succès',
+          'submitted',
+          'soumis'
+        ];
+        
+        for (var i = 0; i < successIndicators.length; i++) {
+          if (bodyText.includes(successIndicators[i])) {
+            return true;
+          }
+        }
+        return false;
+      })();
+    ''';
+
+    try {
+      final result = await _webViewController!.evaluateJavascript(source: jsCode);
+      if (result == true) {
+        await _handleSuccessfulSubmission();
+      }
+    } catch (e) {
+      debugPrint('Error checking page content: $e');
+    }
+  }
+
+  Future<void> _handleSuccessfulSubmission() async {
+    if (_submissionRecorded) return;
+    
+    _submissionRecorded = true;
+    
+    // Capture screenshot
+    String? screenshotPath;
+    try {
+      screenshotPath = await _captureScreenshot();
+    } catch (e) {
+      debugPrint('Error capturing screenshot: $e');
+    }
+    
+    // Get submitted data
+    final submittedData = await _getSubmittedDataFromForm();
+    
+    // Update the data with screenshot path
+    final updatedData = UserData(
+      title: submittedData.title,
+      firstName: submittedData.firstName,
+      lastName: submittedData.lastName,
+      phone: submittedData.phone,
+      email: submittedData.email,
+      realEstateProject: submittedData.realEstateProject,
+      unit: submittedData.unit,
+      language: submittedData.language,
+      imagePath: screenshotPath,
+    );
+    
+    // Add to history
+    if (mounted) {
+      Provider.of<HistoryProvider>(context, listen: false)
+          .addTicket('Success', updatedData);
+    }
+    
+    // Show success countdown
+    setState(() {
+      _showingSuccessCountdown = true;
+      _countdownSeconds = 7;
+    });
+    
+    _startCountdown();
+  }
+
+  Future<String?> _captureScreenshot() async {
+    if (_webViewController == null) return null;
+    
+    try {
+      final Uint8List? screenshot = await _webViewController!.takeScreenshot();
+      if (screenshot != null) {
+        final appDocsDir = await getApplicationDocumentsDirectory();
+        final uniqueFileName = 'screenshot_${const Uuid().v4()}.png';
+        final file = File('${appDocsDir.path}/$uniqueFileName');
+        await file.writeAsBytes(screenshot);
+        return file.path;
+      }
+    } catch (e) {
+      debugPrint('Error capturing screenshot: $e');
+    }
+    return null;
+  }
+
+  void _startCountdown() {
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted && _showingSuccessCountdown) {
+        setState(() {
+          _countdownSeconds--;
+        });
+        
+        if (_countdownSeconds > 0) {
+          _startCountdown();
+        } else {
+          // Navigate back to main screen
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      }
+    });
   }
 
   Future<void> _handleFileUpload() async {
@@ -357,7 +560,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
         currentUrl.contains('erreur');
         
     if (isSuccess) {
-      _recordSubmissionResult('Success');
+      _handleSuccessfulSubmission();
     } else if (isFail) {
       _recordSubmissionResult('Fail');
     }
@@ -380,19 +583,15 @@ class _WebViewScreenState extends State<WebViewScreen> {
           title: Row(
             children: [
               Icon(
-                status == 'Success'
-                    ? Icons.check_circle
-                    : Icons.error_outline,
-                color: status == 'Success' ? Colors.green : Colors.red,
+                Icons.error_outline,
+                color: Colors.red,
               ),
               const SizedBox(width: 12),
-              Text(status == 'Success' ? 'Success!' : 'Failed'),
+              const Text('Failed'),
             ],
           ),
-          content: Text(
-            status == 'Success'
-                ? 'Your request has been submitted successfully!'
-                : 'There was an issue with your request. Please try again.',
+          content: const Text(
+            'There was an issue with your request. Please try again.',
           ),
           actions: [
             TextButton(

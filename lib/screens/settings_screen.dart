@@ -240,6 +240,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               labelText: 'Title',
                               prefixIcon: Icon(Icons.person_outline),
                             ),
+                            icon: const Icon(Icons.arrow_drop_down),
                             items: Constants.titles.map((title) {
                               return DropdownMenuItem(value: title, child: Text(title));
                             }).toList(),
@@ -343,21 +344,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
                         children: [
-                          // Real Estate Project
+                          // Real Estate Project - Fixed dropdown with explicit icon
                           DropdownButtonFormField<String>(
                             value: _selectedProject,
                             decoration: const InputDecoration(
                               labelText: 'Real Estate Project',
                               prefixIcon: Icon(Icons.business),
                             ),
+                            icon: Icon(
+                              Icons.arrow_drop_down,
+                              color: _isEditing 
+                                  ? Theme.of(context).colorScheme.onSurface
+                                  : Theme.of(context).disabledColor,
+                            ),
+                            isExpanded: true,
                             items: Constants.realEstateProjects.map((project) {
-                              return DropdownMenuItem(value: project, child: Text(project));
+                              return DropdownMenuItem(
+                                value: project,
+                                child: Text(
+                                  project,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
                             }).toList(),
                             onChanged: _isEditing ? (value) {
                               setState(() {
                                 _selectedProject = value!;
                               });
                             } : null,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please select a real estate project';
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 16),
 
