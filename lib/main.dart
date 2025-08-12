@@ -42,11 +42,11 @@ class LuxoApp extends StatelessWidget {
             foregroundColor: Color(0xFFD4AF37),
             elevation: 0,
           ),
-          cardTheme: CardTheme(
-            color: const Color(0xFF1A1A1A),
+          cardTheme: const CardThemeData(
+            color: Color(0xFF1A1A1A),
             elevation: 4,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.all(Radius.circular(12)),
             ),
           ),
           elevatedButtonTheme: ElevatedButtonThemeData(
@@ -77,7 +77,7 @@ class LuxoApp extends StatelessWidget {
             labelStyle: const TextStyle(color: Color(0xFFB0B0B0)),
             hintStyle: const TextStyle(color: Color(0xFF808080)),
           ),
-          bottomNavigationBarTheme: const BottomNavigationBarTheme(
+          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
             backgroundColor: Color(0xFF1A1A1A),
             selectedItemColor: Color(0xFFD4AF37),
             unselectedItemColor: Color(0xFF808080),

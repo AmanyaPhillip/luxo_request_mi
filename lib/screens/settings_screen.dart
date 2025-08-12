@@ -20,7 +20,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   late String _selectedTitle;
   late String _selectedProject;
-  late String _selectedLanguage;
+  late Language _selectedLanguage;
   
   bool _isEditing = false;
   bool _isLoading = false;
@@ -43,7 +43,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     _selectedTitle = userData?.title ?? Constants.titles.first;
     _selectedProject = userData?.realEstateProject ?? Constants.realEstateProjects.first;
-    _selectedLanguage = userData?.language ?? Constants.languages.first;
+    _selectedLanguage = Constants.languages.firstWhere(
+      (lang) => lang.name == (userData?.language ?? 'English'),
+      orElse: () => Constants.languages.first,
+    );
   }
 
   @override
@@ -73,7 +76,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       email: _emailController.text.trim(),
       realEstateProject: _selectedProject,
       unit: _unitController.text.trim(),
-      language: _selectedLanguage,
+      language: _selectedLanguage.name,
     );
 
     try {
@@ -403,8 +406,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           const SizedBox(height: 12),
                           ...Constants.languages.map(
-                            (language) => RadioListTile<String>(
-                              title: Text(language),
+                            (language) => RadioListTile<Language>(
+                              title: Text(language.nativeName),
                               value: language,
                               groupValue: _selectedLanguage,
                               onChanged: _isEditing ? (value) {

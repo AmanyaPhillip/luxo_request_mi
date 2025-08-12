@@ -21,8 +21,14 @@ class _SetupScreenState extends State<SetupScreen> {
 
   String _selectedTitle = Constants.titles.first;
   String _selectedProject = Constants.realEstateProjects.first;
-  String _selectedLanguage = Constants.languages.first;
+  late Language _selectedLanguage;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedLanguage = Constants.languages.first;
+  }
 
   @override
   void dispose() {
@@ -51,7 +57,7 @@ class _SetupScreenState extends State<SetupScreen> {
       email: _emailController.text.trim(),
       realEstateProject: _selectedProject,
       unit: _unitController.text.trim(),
-      language: _selectedLanguage,
+      language: _selectedLanguage.name,
     );
 
     try {
@@ -111,7 +117,7 @@ class _SetupScreenState extends State<SetupScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Welcome! Let\'s set up your profile',
+                      'Welcome! Let\'s set up your profile / Bienvenue ! Configurons votre profil',
                       style: TextStyle(
                         fontSize: 16,
                         color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
@@ -132,7 +138,7 @@ class _SetupScreenState extends State<SetupScreen> {
                     DropdownButtonFormField<String>(
                       value: _selectedTitle,
                       decoration: const InputDecoration(
-                        labelText: 'Title',
+                        labelText: 'Title / Titre',
                         prefixIcon: Icon(Icons.person_outline),
                       ),
                       items: Constants.titles.map((title) {
@@ -150,7 +156,7 @@ class _SetupScreenState extends State<SetupScreen> {
                     TextFormField(
                       controller: _firstNameController,
                       decoration: const InputDecoration(
-                        labelText: 'First Name',
+                        labelText: 'First Name / Prénom',
                         prefixIcon: Icon(Icons.person),
                       ),
                       validator: (value) {
@@ -166,7 +172,7 @@ class _SetupScreenState extends State<SetupScreen> {
                     TextFormField(
                       controller: _lastNameController,
                       decoration: const InputDecoration(
-                        labelText: 'Last Name',
+                        labelText: 'Last Name / Nom de famille',
                         prefixIcon: Icon(Icons.person),
                       ),
                       validator: (value) {
@@ -182,7 +188,7 @@ class _SetupScreenState extends State<SetupScreen> {
                     TextFormField(
                       controller: _phoneController,
                       decoration: const InputDecoration(
-                        labelText: 'Phone Number',
+                        labelText: 'Phone Number / Numéro de téléphone',
                         prefixIcon: Icon(Icons.phone),
                       ),
                       keyboardType: TextInputType.phone,
@@ -199,7 +205,7 @@ class _SetupScreenState extends State<SetupScreen> {
                     TextFormField(
                       controller: _emailController,
                       decoration: const InputDecoration(
-                        labelText: 'Email',
+                        labelText: 'Email / Courriel',
                         prefixIcon: Icon(Icons.email),
                       ),
                       keyboardType: TextInputType.emailAddress,
@@ -219,7 +225,7 @@ class _SetupScreenState extends State<SetupScreen> {
                     DropdownButtonFormField<String>(
                       value: _selectedProject,
                       decoration: const InputDecoration(
-                        labelText: 'Real Estate Project',
+                        labelText: 'Real Estate Project / Projet immobilier',
                         prefixIcon: Icon(Icons.business),
                       ),
                       items: Constants.realEstateProjects.map((project) {
@@ -237,7 +243,7 @@ class _SetupScreenState extends State<SetupScreen> {
                     TextFormField(
                       controller: _unitController,
                       decoration: const InputDecoration(
-                        labelText: 'Unit',
+                        labelText: 'Unit / Unité',
                         prefixIcon: Icon(Icons.home),
                       ),
                       validator: (value) {
@@ -257,7 +263,7 @@ class _SetupScreenState extends State<SetupScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Preferred Language',
+                              'Preferred Language / Langue préférée',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
@@ -268,8 +274,11 @@ class _SetupScreenState extends State<SetupScreen> {
                             Row(
                               children: Constants.languages.map((language) {
                                 return Expanded(
-                                  child: RadioListTile<String>(
-                                    title: Text(language),
+                                  child: RadioListTile<Language>(
+                                    title: Text(
+                                      language.nativeName,
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
                                     value: language,
                                     groupValue: _selectedLanguage,
                                     onChanged: (value) {
@@ -277,6 +286,8 @@ class _SetupScreenState extends State<SetupScreen> {
                                         _selectedLanguage = value!;
                                       });
                                     },
+                                    contentPadding: EdgeInsets.zero,
+                                    dense: true,
                                   ),
                                 );
                               }).toList(),
@@ -305,11 +316,13 @@ class _SetupScreenState extends State<SetupScreen> {
                                 ),
                               )
                             : const Text(
-                                'Complete Setup',
+                                'Complete Setup / Terminer la configuration',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
+
                                 ),
+                                textAlign: TextAlign.center,
                               ),
                       ),
                     ),

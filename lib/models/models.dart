@@ -76,6 +76,13 @@ class Ticket {
   }
 }
 
+class Language {
+  final String name;
+  final String nativeName;
+
+  const Language({required this.name, required this.nativeName});
+}
+
 // Constants for dropdown values
 class Constants {
   static const List<String> titles = ['Mr.', 'Mrs.'];
@@ -93,7 +100,10 @@ class Constants {
     'Frontenac',
   ];
 
-  static const List<String> languages = ['English', 'French'];
+  static const List<Language> languages = [
+    Language(name: 'English', nativeName: 'English'),
+    Language(name: 'French', nativeName: 'Français'),
+  ];
   
   // URL mapping
   static String getRequestUrl(String language) {

@@ -82,8 +82,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 
                 // Auto-populate form fields after page loads
                 await _populateFormFields();
+                
+                // Check for submission results in the current URL
+                _checkSubmissionResult(url?.toString() ?? '');
               },
-              onUrlChange: (controller, url) {
+              onUpdateVisitedHistory: (controller, url, isReload) {
                 // Monitor URL changes to detect submission results
                 _checkSubmissionResult(url?.toString() ?? '');
               },
@@ -192,7 +195,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   void _checkSubmissionResult(String currentUrl) {
-    // Check for success/failure indicators in the URL or page content
+    // Check for success/failure indicators in the URL
     if (currentUrl.contains('success') || 
         currentUrl.contains('thank') || 
         currentUrl.contains('merci')) {
