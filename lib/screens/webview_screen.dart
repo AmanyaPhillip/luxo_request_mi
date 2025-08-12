@@ -1,6 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 import '../providers/history_provider.dart';
 
@@ -22,6 +27,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
   InAppWebViewController? _webViewController;
   bool _isLoading = true;
   double _loadingProgress = 0;
+  bool _isInitialLoad = true;
+  bool _submissionRecorded = false;
+  String? _uploadedFilePath;
 
   @override
   Widget build(BuildContext context) {
@@ -32,22 +40,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        actions: [
-          if (_isLoading)
-            Container(
-              margin: const EdgeInsets.all(16),
-              width: 20,
-              height: 20,
-              child: const CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            ),
-        ],
       ),
       body: Column(
         children: [
-          // Loading Progress Bar
           if (_isLoading)
             LinearProgressIndicator(
               value: _loadingProgress,
@@ -56,8 +51,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 Theme.of(context).colorScheme.primary,
               ),
             ),
-          
-          // WebView
           Expanded(
             child: InAppWebView(
               initialUrlRequest: URLRequest(url: WebUri(widget.url)),
@@ -79,16 +72,48 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 setState(() {
                   _isLoading = false;
                 });
-                
-                // Auto-populate form fields after page loads
-                await _populateFormFields();
-                
-                // Check for submission results in the current URL
-                _checkSubmissionResult(url?.toString() ?? '');
+                if (_isInitialLoad) {
+                  await _populateFormFields();
+                  setState(() {
+                    _isInitialLoad = false;
+                  });
+                }
               },
               onUpdateVisitedHistory: (controller, url, isReload) {
-                // Monitor URL changes to detect submission results
-                _checkSubmissionResult(url?.toString() ?? '');
+                if (!_isInitialLoad && url.toString() != widget.url) {
+                  _checkSubmissionResult(url?.toString() ?? '');
+                }
+              },
+              onOpenFileChooser: (controller, fileChooserParams) async {
+                final result = await FilePicker.platform.pickFiles(
+                  type: FileType.image,
+                );
+
+                if (result != null && result.files.single.path != null) {
+                  final file = File(result.files.single.path!);
+
+                  if (await file.length() > 5 * 1024 * 1024) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text(
+                              'File is too large. Please select an image under 5MB.')));
+                    }
+                    return [];
+                  }
+
+                  final appDocsDir =
+                      await getApplicationDocumentsDirectory();
+                  final uniqueFileName = '${const Uuid().v4()}.jpg';
+                  final savedFile = await file
+                      .copy('${appDocsDir.path}/$uniqueFileName');
+
+                  setState(() {
+                    _uploadedFilePath = savedFile.path;
+                  });
+
+                  return [Uri.file(savedFile.path)];
+                }
+                return [];
               },
               initialSettings: InAppWebViewSettings(
                 useShouldOverrideUrlLoading: true,
@@ -101,20 +126,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
       ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          border: Border(
-            top: BorderSide(
-              color: Theme.of(context).dividerColor,
-              width: 0.5,
-            ),
-          ),
-        ),
         child: Text(
-          'Form will be automatically populated with your saved information',
+          'Form will be automatically populated. Please review and submit.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
-          ),
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
+              ),
           textAlign: TextAlign.center,
         ),
       ),
@@ -123,54 +139,30 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   Future<void> _populateFormFields() async {
     if (_webViewController == null) return;
-
-    // JavaScript to populate form fields
     final jsCode = '''
       (function() {
         try {
-          // Title/Salutation
           var salutationField = document.querySelector('select[name="salutation"], #salutation');
-          if (salutationField) {
-            salutationField.value = "${widget.userData.title == 'Mr.' ? 'Monsieur' : 'Madame'}";
-          }
-
-          // First Name
+          if (salutationField) salutationField.value = "${widget.userData.title == 'Mr.' ? 'Monsieur' : 'Madame'}";
+          
           var firstNameField = document.querySelector('input[name="prenom"], #prenom');
-          if (firstNameField) {
-            firstNameField.value = "${widget.userData.firstName}";
-          }
+          if (firstNameField) firstNameField.value = "${widget.userData.firstName}";
 
-          // Last Name
           var lastNameField = document.querySelector('input[name="nom"], #nom');
-          if (lastNameField) {
-            lastNameField.value = "${widget.userData.lastName}";
-          }
+          if (lastNameField) lastNameField.value = "${widget.userData.lastName}";
 
-          // Phone
           var phoneField = document.querySelector('input[name="telephone"], #telephone');
-          if (phoneField) {
-            phoneField.value = "${widget.userData.phone}";
-          }
+          if (phoneField) phoneField.value = "${widget.userData.phone}";
 
-          // Email
           var emailField = document.querySelector('input[name="courriel"], #courriel');
-          if (emailField) {
-            emailField.value = "${widget.userData.email}";
-          }
+          if (emailField) emailField.value = "${widget.userData.email}";
 
-          // Project
           var projectField = document.querySelector('select[name="projet"], #projet');
-          if (projectField) {
-            projectField.value = "${widget.userData.realEstateProject}";
-          }
+          if (projectField) projectField.value = "${widget.userData.realEstateProject}";
 
-          // Unit
           var unitField = document.querySelector('input[name="unite"], #unite');
-          if (unitField) {
-            unitField.value = "${widget.userData.unit}";
-          }
+          if (unitField) unitField.value = "${widget.userData.unit}";
 
-          // Trigger change events to ensure form validation
           var fields = [salutationField, firstNameField, lastNameField, phoneField, emailField, projectField, unitField];
           fields.forEach(function(field) {
             if (field) {
@@ -178,115 +170,105 @@ class _WebViewScreenState extends State<WebViewScreen> {
               field.dispatchEvent(event);
             }
           });
-
           return "Form populated successfully";
         } catch (error) {
           return "Error populating form: " + error.message;
         }
       })();
     ''';
+    await _webViewController!.evaluateJavascript(source: jsCode);
+  }
+
+  Future<UserData> _getSubmittedDataFromForm() async {
+    if (_webViewController == null) return widget.userData;
+    final jsCode = '''
+    (function() {
+      function getValue(selector) {
+        var el = document.querySelector(selector);
+        return el ? el.value : '';
+      }
+      return JSON.stringify({
+        "title": getValue('select[name="salutation"], #salutation'),
+        "firstName": getValue('input[name="prenom"], #prenom'),
+        "lastName": getValue('input[name="nom"], #nom'),
+        "phone": getValue('input[name="telephone"], #telephone'),
+        "email": getValue('input[name="courriel"], #courriel'),
+        "realEstateProject": getValue('select[name="projet"], #projet'),
+        "unit": getValue('input[name="unite"], #unite'),
+        "language": "${widget.userData.language}"
+      });
+    })();
+    ''';
 
     try {
       final result = await _webViewController!.evaluateJavascript(source: jsCode);
-      print('Form population result: $result');
+      if (result != null) {
+        final Map<String, dynamic> scrapedData = jsonDecode(result);
+        if (scrapedData['title'] == 'Monsieur') scrapedData['title'] = 'Mr.';
+        if (scrapedData['title'] == 'Madame') scrapedData['title'] = 'Mrs.';
+        scrapedData['imagePath'] = _uploadedFilePath;
+        return UserData.fromJson(scrapedData);
+      }
     } catch (e) {
-      print('Error populating form: $e');
+      debugPrint('Error scraping form data: $e');
     }
+    return widget.userData;
   }
 
   void _checkSubmissionResult(String currentUrl) {
-    // Check for success/failure indicators in the URL
-    if (currentUrl.contains('success') || 
-        currentUrl.contains('thank') || 
-        currentUrl.contains('merci')) {
+    if (_submissionRecorded) return;
+    bool isSuccess = currentUrl.contains('success') ||
+        currentUrl.contains('thank') ||
+        currentUrl.contains('merci');
+    bool isFail = currentUrl.contains('error') ||
+        currentUrl.contains('fail') ||
+        currentUrl.contains('erreur');
+    if (isSuccess) {
       _recordSubmissionResult('Success');
-    } else if (currentUrl.contains('error') || 
-               currentUrl.contains('fail') || 
-               currentUrl.contains('erreur')) {
+    } else if (isFail) {
       _recordSubmissionResult('Fail');
     }
-    
-    // Also check page content for success/failure messages
-    _checkPageContent();
   }
 
-  Future<void> _checkPageContent() async {
-    if (_webViewController == null) return;
-
-    try {
-      // JavaScript to check for success/failure messages in the page content
-      final jsCode = '''
-        (function() {
-          var bodyText = document.body.innerText.toLowerCase();
-          
-          // Success indicators
-          if (bodyText.includes('thank you') || 
-              bodyText.includes('success') ||
-              bodyText.includes('merci') ||
-              bodyText.includes('succès') ||
-              bodyText.includes('votre demande a été') ||
-              bodyText.includes('request submitted')) {
-            return 'Success';
-          }
-          
-          // Failure indicators
-          if (bodyText.includes('error') ||
-              bodyText.includes('failed') ||
-              bodyText.includes('erreur') ||
-              bodyText.includes('échec') ||
-              bodyText.includes('something went wrong')) {
-            return 'Fail';
-          }
-          
-          return 'Unknown';
-        })();
-      ''';
-
-      final result = await _webViewController!.evaluateJavascript(source: jsCode);
-      
-      if (result == 'Success' || result == 'Fail') {
-        _recordSubmissionResult(result);
-      }
-    } catch (e) {
-      print('Error checking page content: $e');
-    }
-  }
-
-  void _recordSubmissionResult(String status) {
-    // Add ticket to history
-    Provider.of<HistoryProvider>(context, listen: false)
-        .addTicket(widget.userData.realEstateProject, status);
-    
-    // Show result dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              status == 'Success' ? Icons.check_circle : Icons.error_outline,
-              color: status == 'Success' ? Colors.green : Colors.red,
+  void _recordSubmissionResult(String status) async {
+    if (_submissionRecorded) return;
+    _submissionRecorded = true;
+    final submittedData = await _getSubmittedDataFromForm();
+    if (mounted) {
+      Provider.of<HistoryProvider>(context, listen: false)
+          .addTicket(status, submittedData);
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                status == 'Success'
+                    ? Icons.check_circle
+                    : Icons.error_outline,
+                color: status == 'Success' ? Colors.green : Colors.red,
+              ),
+              const SizedBox(width: 12),
+              Text(status == 'Success' ? 'Success!' : 'Failed'),
+            ],
+          ),
+          content: Text(
+            status == 'Success'
+                ? 'Your request has been submitted successfully!'
+                : 'There was an issue with your request. Please try again.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK'),
             ),
-            const SizedBox(width: 12),
-            Text(status == 'Success' ? 'Success!' : 'Failed'),
           ],
         ),
-        content: Text(
-          status == 'Success'
-              ? 'Your request has been submitted successfully!'
-              : 'There was an issue with your request. Please try again.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Close dialog
-              Navigator.of(context).pop(); // Close webview
-            },
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+      );
+    }
   }
 }

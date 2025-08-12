@@ -8,6 +8,7 @@ class UserData {
   final String realEstateProject;
   final String unit;
   final String language;
+  final String? imagePath;
 
   UserData({
     required this.title,
@@ -18,6 +19,7 @@ class UserData {
     required this.realEstateProject,
     required this.unit,
     required this.language,
+    this.imagePath,
   });
 
   Map<String, dynamic> toJson() {
@@ -30,6 +32,7 @@ class UserData {
       'realEstateProject': realEstateProject,
       'unit': unit,
       'language': language,
+      'imagePath': imagePath,
     };
   }
 
@@ -43,35 +46,38 @@ class UserData {
       realEstateProject: json['realEstateProject'] ?? '',
       unit: json['unit'] ?? '',
       language: json['language'] ?? 'English',
+      imagePath: json['imagePath'],
     );
   }
 }
 
 // History ticket model
 class Ticket {
-  final String projectName;
   final String status; // "Success" or "Fail"
   final DateTime requestDate;
+  final UserData submittedData;
 
   Ticket({
-    required this.projectName,
     required this.status,
     required this.requestDate,
+    required this.submittedData,
   });
+
+  String get projectName => submittedData.realEstateProject;
 
   Map<String, dynamic> toJson() {
     return {
-      'projectName': projectName,
       'status': status,
       'requestDate': requestDate.toIso8601String(),
+      'submittedData': submittedData.toJson(),
     };
   }
 
   factory Ticket.fromJson(Map<String, dynamic> json) {
     return Ticket(
-      projectName: json['projectName'] ?? '',
       status: json['status'] ?? 'Unknown',
       requestDate: DateTime.parse(json['requestDate']),
+      submittedData: UserData.fromJson(json['submittedData'] ?? {}),
     );
   }
 }
@@ -86,7 +92,7 @@ class Language {
 // Constants for dropdown values
 class Constants {
   static const List<String> titles = ['Mr.', 'Mrs.'];
-  
+
   static const List<String> realEstateProjects = [
     'La Suite',
     'L\'Aristocrate',
@@ -104,11 +110,10 @@ class Constants {
     Language(name: 'English', nativeName: 'English'),
     Language(name: 'French', nativeName: 'Français'),
   ];
-  
-  // URL mapping
+
   static String getRequestUrl(String language) {
-    return language == 'French' 
-        ? 'https://dma.immo/request/' 
+    return language == 'French'
+        ? 'https://dma.immo/request/'
         : 'https://dma.immo/en/request/';
   }
 }

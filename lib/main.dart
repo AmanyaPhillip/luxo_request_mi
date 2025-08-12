@@ -111,11 +111,11 @@ class _AppWrapperState extends State<AppWrapper> {
     final prefs = await SharedPreferences.getInstance();
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final historyProvider = Provider.of<HistoryProvider>(context, listen: false);
-    
+
     // Load user data and check if setup is complete
     await userProvider.loadUserData();
     await historyProvider.loadHistory();
-    
+
     setState(() {
       _isFirstTime = !userProvider.isSetupComplete;
       _isLoading = false;
@@ -134,6 +134,16 @@ class _AppWrapperState extends State<AppWrapper> {
       );
     }
 
-    return _isFirstTime ? const SetupScreen() : const HomeScreen();
+    // This logic ensures that if the user data is cleared (e.g., from settings),
+    // the app will navigate back to the setup screen upon restart.
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        if (userProvider.isSetupComplete) {
+          return const HomeScreen();
+        } else {
+          return const SetupScreen();
+        }
+      },
+    );
   }
 }

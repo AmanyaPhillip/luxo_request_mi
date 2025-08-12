@@ -96,7 +96,6 @@ class _SetupScreenState extends State<SetupScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 40),
-              // LUXO branding
               Center(
                 child: Column(
                   children: [
@@ -129,12 +128,10 @@ class _SetupScreenState extends State<SetupScreen> {
               ),
               const SizedBox(height: 40),
               
-              // Form
               Form(
                 key: _formKey,
                 child: Column(
                   children: [
-                    // Title Dropdown
                     DropdownButtonFormField<String>(
                       value: _selectedTitle,
                       decoration: const InputDecoration(
@@ -151,8 +148,6 @@ class _SetupScreenState extends State<SetupScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-
-                    // First Name
                     TextFormField(
                       controller: _firstNameController,
                       decoration: const InputDecoration(
@@ -167,8 +162,6 @@ class _SetupScreenState extends State<SetupScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-
-                    // Last Name
                     TextFormField(
                       controller: _lastNameController,
                       decoration: const InputDecoration(
@@ -183,8 +176,6 @@ class _SetupScreenState extends State<SetupScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-
-                    // Phone
                     TextFormField(
                       controller: _phoneController,
                       decoration: const InputDecoration(
@@ -200,8 +191,6 @@ class _SetupScreenState extends State<SetupScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-
-                    // Email
                     TextFormField(
                       controller: _emailController,
                       decoration: const InputDecoration(
@@ -220,8 +209,6 @@ class _SetupScreenState extends State<SetupScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-
-                    // Real Estate Project
                     DropdownButtonFormField<String>(
                       value: _selectedProject,
                       decoration: const InputDecoration(
@@ -238,8 +225,6 @@ class _SetupScreenState extends State<SetupScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-
-                    // Unit
                     TextFormField(
                       controller: _unitController,
                       decoration: const InputDecoration(
@@ -254,8 +239,6 @@ class _SetupScreenState extends State<SetupScreen> {
                       },
                     ),
                     const SizedBox(height: 24),
-
-                    // Language Toggle
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
@@ -297,8 +280,6 @@ class _SetupScreenState extends State<SetupScreen> {
                       ),
                     ),
                     const SizedBox(height: 32),
-
-                    // Submit Button
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -320,7 +301,6 @@ class _SetupScreenState extends State<SetupScreen> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-
                                 ),
                                 textAlign: TextAlign.center,
                               ),

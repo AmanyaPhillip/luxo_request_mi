@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/history_provider.dart';
 import '../models/models.dart';
+import 'history_detail_screen.dart'; // Import the new screen
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
@@ -120,7 +121,17 @@ class HistoryScreen extends StatelessWidget {
                   separatorBuilder: (context, index) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final ticket = historyProvider.tickets[index];
-                    return _buildHistoryCard(context, ticket);
+                    // ✨ CHANGE: Added GestureDetector for navigation ✨
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => HistoryDetailScreen(ticket: ticket),
+                          ),
+                        );
+                      },
+                      child: _buildHistoryCard(context, ticket),
+                    );
                   },
                 ),
               ),
@@ -180,10 +191,8 @@ class HistoryScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Row
             Row(
               children: [
-                // Project Icon
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -197,8 +206,6 @@ class HistoryScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                
-                // Project Name
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,8 +226,6 @@ class HistoryScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                
-                // Status Badge
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
@@ -253,36 +258,6 @@ class HistoryScreen extends StatelessWidget {
                 ),
               ],
             ),
-            
-            const SizedBox(height: 12),
-            
-            // Additional Details
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Theme.of(context).dividerColor.withOpacity(0.5),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.access_time,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Submitted on ${_formatDateLong(ticket.requestDate)}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),
@@ -291,15 +266,6 @@ class HistoryScreen extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
-  }
-
-  String _formatDateLong(DateTime date) {
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
-    return '${months[date.month - 1]} ${date.day}, ${date.year} at ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
   void _showClearHistoryDialog(BuildContext context, HistoryProvider historyProvider) {
