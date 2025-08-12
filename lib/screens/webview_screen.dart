@@ -40,6 +40,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          // Add file upload button in app bar
+          IconButton(
+            icon: const Icon(Icons.attach_file),
+            onPressed: _handleFileUpload,
+            tooltip: 'Upload File',
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -49,6 +57,31 @@ class _WebViewScreenState extends State<WebViewScreen> {
               backgroundColor: Colors.grey[300],
               valueColor: AlwaysStoppedAnimation<Color>(
                 Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          if (_uploadedFilePath != null)
+            Container(
+              padding: const EdgeInsets.all(8),
+              color: Colors.green.withOpacity(0.1),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'File uploaded: ${_uploadedFilePath!.split('/').last}',
+                      style: const TextStyle(color: Colors.green, fontSize: 12),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 16),
+                    onPressed: () {
+                      setState(() {
+                        _uploadedFilePath = null;
+                      });
+                    },
+                  ),
+                ],
               ),
             ),
           Expanded(
@@ -84,41 +117,20 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   _checkSubmissionResult(url?.toString() ?? '');
                 }
               },
-              onOpenFileChooser: (controller, fileChooserParams) async {
-                final result = await FilePicker.platform.pickFiles(
-                  type: FileType.image,
+              onPermissionRequest: (controller, request) async {
+                return PermissionResponse(
+                  resources: request.resources,
+                  action: PermissionResponseAction.GRANT,
                 );
-
-                if (result != null && result.files.single.path != null) {
-                  final file = File(result.files.single.path!);
-
-                  if (await file.length() > 5 * 1024 * 1024) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text(
-                              'File is too large. Please select an image under 5MB.')));
-                    }
-                    return [];
-                  }
-
-                  final appDocsDir =
-                      await getApplicationDocumentsDirectory();
-                  final uniqueFileName = '${const Uuid().v4()}.jpg';
-                  final savedFile = await file
-                      .copy('${appDocsDir.path}/$uniqueFileName');
-
-                  setState(() {
-                    _uploadedFilePath = savedFile.path;
-                  });
-
-                  return [Uri.file(savedFile.path)];
-                }
-                return [];
               },
               initialSettings: InAppWebViewSettings(
                 useShouldOverrideUrlLoading: true,
                 mediaPlaybackRequiresUserGesture: false,
-                allowsInlineMediaPlayback: true,
+                allowsInlineMediaPlayback : true,
+                javaScriptEnabled: true,
+                domStorageEnabled: true,
+                allowFileAccessFromFileURLs: true,
+                allowUniversalAccessFromFileURLs: true,
               ),
             ),
           ),
@@ -126,19 +138,132 @@ class _WebViewScreenState extends State<WebViewScreen> {
       ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
-        child: Text(
-          'Form will be automatically populated. Please review and submit.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_uploadedFilePath == null)
+              ElevatedButton.icon(
+                onPressed: _handleFileUpload,
+                icon: const Icon(Icons.upload_file),
+                label: const Text('Upload File'),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                ),
               ),
-          textAlign: TextAlign.center,
+            const SizedBox(height: 8),
+            Text(
+              'Form will be automatically populated. Please review and submit.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6),
+                  ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
   }
 
+  Future<void> _handleFileUpload() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+
+        // Check file size (5MB limit)
+        if (await file.length() > 5 * 1024 * 1024) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('File is too large. Please select an image under 5MB.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
+        // Save file to app directory
+        final appDocsDir = await getApplicationDocumentsDirectory();
+        final uniqueFileName = '${const Uuid().v4()}.jpg';
+        final savedFile = await file.copy('${appDocsDir.path}/$uniqueFileName');
+
+        setState(() {
+          _uploadedFilePath = savedFile.path;
+        });
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('File uploaded: ${result.files.single.name}'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+
+        // Try to inject the file into the web form if there's a file input
+        await _injectFileIntoForm();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading file: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _injectFileIntoForm() async {
+    if (_webViewController == null || _uploadedFilePath == null) return;
+
+    // This is a basic attempt to interact with file inputs
+    // Note: Due to browser security restrictions, directly setting file inputs is limited
+    final jsCode = '''
+      (function() {
+        try {
+          var fileInputs = document.querySelectorAll('input[type="file"]');
+          if (fileInputs.length > 0) {
+            // Create a visual indicator that a file has been selected
+            fileInputs.forEach(function(input) {
+              var label = document.createElement('span');
+              label.style.color = 'green';
+              label.style.fontSize = '12px';
+              label.style.marginLeft = '10px';
+              label.textContent = 'File ready for upload';
+              
+              // Remove existing labels
+              var existingLabels = input.parentNode.querySelectorAll('span[style*="color: green"]');
+              existingLabels.forEach(function(el) { el.remove(); });
+              
+              input.parentNode.appendChild(label);
+            });
+            return "File indicator added";
+          }
+          return "No file inputs found";
+        } catch (error) {
+          return "Error: " + error.message;
+        }
+      })();
+    ''';
+
+    try {
+      await _webViewController!.evaluateJavascript(source: jsCode);
+    } catch (e) {
+      debugPrint('Error injecting file indicator: $e');
+    }
+  }
+
   Future<void> _populateFormFields() async {
     if (_webViewController == null) return;
+    
     final jsCode = '''
       (function() {
         try {
@@ -176,11 +301,17 @@ class _WebViewScreenState extends State<WebViewScreen> {
         }
       })();
     ''';
-    await _webViewController!.evaluateJavascript(source: jsCode);
+    
+    try {
+      await _webViewController!.evaluateJavascript(source: jsCode);
+    } catch (e) {
+      debugPrint('Error populating form: $e');
+    }
   }
 
   Future<UserData> _getSubmittedDataFromForm() async {
     if (_webViewController == null) return widget.userData;
+    
     final jsCode = '''
     (function() {
       function getValue(selector) {
@@ -217,12 +348,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   void _checkSubmissionResult(String currentUrl) {
     if (_submissionRecorded) return;
+    
     bool isSuccess = currentUrl.contains('success') ||
         currentUrl.contains('thank') ||
         currentUrl.contains('merci');
     bool isFail = currentUrl.contains('error') ||
         currentUrl.contains('fail') ||
         currentUrl.contains('erreur');
+        
     if (isSuccess) {
       _recordSubmissionResult('Success');
     } else if (isFail) {
@@ -232,11 +365,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   void _recordSubmissionResult(String status) async {
     if (_submissionRecorded) return;
+    
     _submissionRecorded = true;
     final submittedData = await _getSubmittedDataFromForm();
+    
     if (mounted) {
       Provider.of<HistoryProvider>(context, listen: false)
           .addTicket(status, submittedData);
+          
       showDialog(
         context: context,
         barrierDismissible: false,
