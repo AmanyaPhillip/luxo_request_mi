@@ -44,19 +44,25 @@ class _WebViewScreenState extends State<WebViewScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Submit Request'),
-          leading: _showingSuccessCountdown 
-              ? null 
+          leading: _showingSuccessCountdown
+              ? null
               : IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
-          actions: _showingSuccessCountdown 
-              ? null 
+          actions: _showingSuccessCountdown
+              ? null
               : [
                   IconButton(
                     icon: const Icon(Icons.attach_file),
                     onPressed: _handleFileUpload,
                     tooltip: 'Upload File',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.check_circle_outline),
+                    onPressed: _submissionRecorded ? null : _manualSubmit,
+                    tooltip: 'Manual Submit',
+                    color: _submissionRecorded ? Colors.grey : Theme.of(context).colorScheme.primary,
                   ),
                 ],
         ),
@@ -129,13 +135,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                             _isInitialLoad = false;
                           });
                         }
-                        // Check for success message in page content
-                        await _checkPageForSuccess();
-                      }
-                    },
-                    onUpdateVisitedHistory: (controller, url, isReload) {
-                      if (!_isInitialLoad && url.toString() != widget.url && !_showingSuccessCountdown) {
-                        _checkSubmissionResult(url?.toString() ?? '');
                       }
                     },
                     onPermissionRequest: (controller, request) async {
@@ -252,46 +251,60 @@ class _WebViewScreenState extends State<WebViewScreen> {
     );
   }
 
-  Future<void> _checkPageForSuccess() async {
-    if (_webViewController == null || _submissionRecorded) return;
-    
-    final jsCode = '''
-      (function() {
-        var bodyText = document.body.innerText.toLowerCase();
-        var successIndicators = [
-          'request submitted successfully',
-          'demande soumise avec succès',
-          'thank you',
-          'merci',
-          'success',
-          'succès',
-          'submitted',
-          'soumis'
-        ];
-        
-        for (var i = 0; i < successIndicators.length; i++) {
-          if (bodyText.includes(successIndicators[i])) {
-            return true;
-          }
-        }
-        return false;
-      })();
-    ''';
+  Future<void> _manualSubmit() async {
+    if (_submissionRecorded) return;
 
-    try {
-      final result = await _webViewController!.evaluateJavascript(source: jsCode);
-      if (result == true) {
-        await _handleSuccessfulSubmission();
-      }
-    } catch (e) {
-      debugPrint('Error checking page content: $e');
+    // Show confirmation dialog first
+    final bool? shouldSubmit = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.help_outline, color: Colors.orange),
+            SizedBox(width: 12),
+            Text('Manual Submit'),
+          ],
+        ),
+        content: const Text(
+          'Did you successfully submit the form on this page? This will capture a screenshot and record the submission as successful.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Yes, Submit'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSubmit == true) {
+      await _handleManualSubmission();
     }
   }
 
-  Future<void> _handleSuccessfulSubmission() async {
+  Future<void> _handleManualSubmission() async {
     if (_submissionRecorded) return;
     
     _submissionRecorded = true;
+    
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Capturing screenshot...'),
+          ],
+        ),
+      ),
+    );
     
     // Capture screenshot
     String? screenshotPath;
@@ -299,6 +312,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
       screenshotPath = await _captureScreenshot();
     } catch (e) {
       debugPrint('Error capturing screenshot: $e');
+    }
+    
+    // Close loading dialog
+    if (mounted) {
+      Navigator.of(context).pop();
     }
     
     // Get submitted data
@@ -330,41 +348,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
     });
     
     _startCountdown();
-  }
-
-  Future<String?> _captureScreenshot() async {
-    if (_webViewController == null) return null;
-    
-    try {
-      final Uint8List? screenshot = await _webViewController!.takeScreenshot();
-      if (screenshot != null) {
-        final appDocsDir = await getApplicationDocumentsDirectory();
-        final uniqueFileName = 'screenshot_${const Uuid().v4()}.png';
-        final file = File('${appDocsDir.path}/$uniqueFileName');
-        await file.writeAsBytes(screenshot);
-        return file.path;
-      }
-    } catch (e) {
-      debugPrint('Error capturing screenshot: $e');
-    }
-    return null;
-  }
-
-  void _startCountdown() {
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted && _showingSuccessCountdown) {
-        setState(() {
-          _countdownSeconds--;
-        });
-        
-        if (_countdownSeconds > 0) {
-          _startCountdown();
-        } else {
-          // Navigate back to main screen
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      }
-    });
   }
 
   Future<void> _handleFileUpload() async {
@@ -498,6 +481,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
               field.dispatchEvent(event);
             }
           });
+
           return "Form populated successfully";
         } catch (error) {
           return "Error populating form: " + error.message;
@@ -549,61 +533,145 @@ class _WebViewScreenState extends State<WebViewScreen> {
     return widget.userData;
   }
 
-  void _checkSubmissionResult(String currentUrl) {
-    if (_submissionRecorded) return;
-    
-    bool isSuccess = currentUrl.contains('success') ||
-        currentUrl.contains('thank') ||
-        currentUrl.contains('merci');
-    bool isFail = currentUrl.contains('error') ||
-        currentUrl.contains('fail') ||
-        currentUrl.contains('erreur');
-        
-    if (isSuccess) {
-      _handleSuccessfulSubmission();
-    } else if (isFail) {
-      _recordSubmissionResult('Fail');
-    }
-  }
-
-  void _recordSubmissionResult(String status) async {
+  Future<void> _handleSuccessfulSubmission() async {
     if (_submissionRecorded) return;
     
     _submissionRecorded = true;
+    
+    // Capture screenshot
+    String? screenshotPath;
+    try {
+      screenshotPath = await _captureScreenshot();
+    } catch (e) {
+      debugPrint('Error capturing screenshot: $e');
+    }
+    
+    // Get submitted data
     final submittedData = await _getSubmittedDataFromForm();
     
+    // Update the data with screenshot path
+    final updatedData = UserData(
+      title: submittedData.title,
+      firstName: submittedData.firstName,
+      lastName: submittedData.lastName,
+      phone: submittedData.phone,
+      email: submittedData.email,
+      realEstateProject: submittedData.realEstateProject,
+      unit: submittedData.unit,
+      language: submittedData.language,
+      imagePath: screenshotPath,
+    );
+    
+    // Add to history
     if (mounted) {
       Provider.of<HistoryProvider>(context, listen: false)
-          .addTicket(status, submittedData);
-          
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(
-                Icons.error_outline,
-                color: Colors.red,
-              ),
-              const SizedBox(width: 12),
-              const Text('Failed'),
-            ],
-          ),
-          content: const Text(
-            'There was an issue with your request. Please try again.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+          .addTicket('Success', updatedData);
     }
+    
+    // Show success countdown
+    setState(() {
+      _showingSuccessCountdown = true;
+      _countdownSeconds = 7;
+    });
+    
+    _startCountdown();
+  }
+
+  Future<String?> _captureScreenshot() async {
+    if (_webViewController == null) return null;
+    
+    try {
+      // Method 1: Try to capture full page using scroll and stitch
+      return await _captureFullPageScreenshot();
+    } catch (e) {
+      debugPrint('Error capturing full page screenshot: $e');
+      
+      // Fallback to regular screenshot if full page capture fails
+      try {
+        final Uint8List? screenshot = await _webViewController!.takeScreenshot();
+        if (screenshot != null) {
+          final appDocsDir = await getApplicationDocumentsDirectory();
+          final uniqueFileName = 'screenshot_${const Uuid().v4()}.png';
+          final file = File('${appDocsDir.path}/$uniqueFileName');
+          await file.writeAsBytes(screenshot);
+          return file.path;
+        }
+      } catch (fallbackError) {
+        debugPrint('Error with fallback screenshot: $fallbackError');
+      }
+    }
+    return null;
+  }
+
+  Future<String?> _captureFullPageScreenshot() async {
+    if (_webViewController == null) return null;
+    try {
+      // Get page dimensions
+      final pageInfo = await _webViewController!.evaluateJavascript(source: '''
+        (function() {
+          return JSON.stringify({
+            scrollHeight: document.body.scrollHeight,
+            scrollWidth: document.body.scrollWidth,
+            viewportHeight: window.innerHeight
+          });
+        })();
+      ''');
+
+      final Map<String, dynamic> info = jsonDecode(pageInfo);
+      final double scrollHeight = (info['scrollHeight'] as num).toDouble();
+      final double scrollWidth = (info['scrollWidth'] as num).toDouble();
+      final double viewportHeight = (info['viewportHeight'] as num).toDouble();
+
+      // If page is smaller than viewport, take a normal screenshot
+      if (scrollHeight <= viewportHeight) {
+        final screenshot = await _webViewController!.takeScreenshot();
+        if (screenshot != null) {
+          final directory = await getApplicationDocumentsDirectory();
+          final file = File('${directory.path}/screenshot_${const Uuid().v4()}.png');
+          await file.writeAsBytes(screenshot);
+          return file.path;
+        }
+        return null;
+      }
+
+      // Take screenshot with full page dimensions
+      final screenshot = await _webViewController!.takeScreenshot(
+        screenshotConfiguration: ScreenshotConfiguration(
+          rect: InAppWebViewRect(
+            x: 0,
+            y: 0,
+            width: scrollWidth,
+            height: scrollHeight,
+          ),
+        )
+      );
+
+      if (screenshot != null) {
+        final directory = await getApplicationDocumentsDirectory();
+        final file = File('${directory.path}/screenshot_${const Uuid().v4()}.png');
+        await file.writeAsBytes(screenshot);
+        return file.path;
+      }
+    } catch (e) {
+      debugPrint('Error capturing full page screenshot: $e');
+    }
+    return null;
+  }
+
+  void _startCountdown() {
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted && _showingSuccessCountdown) {
+        setState(() {
+          _countdownSeconds--;
+        });
+        
+        if (_countdownSeconds > 0) {
+          _startCountdown();
+        } else {
+          // Navigate back to main screen
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      }
+    });
   }
 }
