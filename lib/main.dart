@@ -5,6 +5,7 @@ import 'providers/user_provider.dart';
 import 'providers/history_provider.dart';
 import 'screens/setup_screen.dart';
 import 'screens/home_screen.dart';
+import 'theme/app_colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,25 +26,24 @@ class LuxoApp extends StatelessWidget {
         title: 'LUXO Request',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          // LUXO Place inspired color scheme - gold and dark theme
           colorScheme: const ColorScheme.dark(
-            primary: Color(0xFFD4AF37), // Luxurious gold
-            secondary: Color(0xFFB8860B), // Darker gold
-            surface: Color(0xFF1A1A1A), // Rich dark
-            background: Color(0xFF0D0D0D), // Deep black
+            primary: AppColors.gold,
+            secondary: AppColors.goldDark,
+            surface: AppColors.surfaceDark,
+            background: AppColors.backgroundDeep,
             onPrimary: Colors.black,
             onSecondary: Colors.white,
-            onSurface: Color(0xFFE0E0E0), // Light text
-            onBackground: Color(0xFFE0E0E0),
+            onSurface: AppColors.textLight,
+            onBackground: AppColors.textLight,
           ),
-          scaffoldBackgroundColor: const Color(0xFF0D0D0D),
+          scaffoldBackgroundColor: AppColors.backgroundDeep,
           appBarTheme: const AppBarTheme(
-            backgroundColor: Color(0xFF1A1A1A),
-            foregroundColor: Color(0xFFD4AF37),
+            backgroundColor: AppColors.surfaceDark,
+            foregroundColor: AppColors.gold,
             elevation: 0,
           ),
           cardTheme: const CardThemeData(
-            color: Color(0xFF1A1A1A),
+            color: AppColors.surfaceDark,
             elevation: 4,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -51,7 +51,7 @@ class LuxoApp extends StatelessWidget {
           ),
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD4AF37),
+              backgroundColor: AppColors.gold,
               foregroundColor: Colors.black,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               shape: RoundedRectangleBorder(
@@ -61,26 +61,26 @@ class LuxoApp extends StatelessWidget {
           ),
           inputDecorationTheme: InputDecorationTheme(
             filled: true,
-            fillColor: const Color(0xFF2A2A2A),
+            fillColor: AppColors.inputFill,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF404040)),
+              borderSide: const BorderSide(color: AppColors.borderIdle),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF404040)),
+              borderSide: const BorderSide(color: AppColors.borderIdle),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFD4AF37)),
+              borderSide: const BorderSide(color: AppColors.gold),
             ),
-            labelStyle: const TextStyle(color: Color(0xFFB0B0B0)),
-            hintStyle: const TextStyle(color: Color(0xFF808080)),
+            labelStyle: const TextStyle(color: AppColors.textMuted),
+            hintStyle: const TextStyle(color: AppColors.textDisabled),
           ),
           bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-            backgroundColor: Color(0xFF1A1A1A),
-            selectedItemColor: Color(0xFFD4AF37),
-            unselectedItemColor: Color(0xFF808080),
+            backgroundColor: AppColors.surfaceDark,
+            selectedItemColor: AppColors.gold,
+            unselectedItemColor: AppColors.textDisabled,
             type: BottomNavigationBarType.fixed,
           ),
         ),
