@@ -1,5 +1,5 @@
 name: luxo_request_mi
-description: "LUXO Place Request Management App"
+description: "Lightweight Flutter app for submitting and tracking LUXO Place service requests."
 publish_to: 'none'
 
 version: 1.0.0+1
